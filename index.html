@@ -130,7 +130,7 @@ img { max-width: 100%; display: block; }
 .logo-upload-zone input[type="file"] { display: none; }
 
 /* ===== DYNAMIC TABLE ===== */
-.dynamic-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+.dynamic-table { width: 100%; border-collapse: collapse; font-size: 11px; min-width: 650px; }
 .dynamic-table th {
   background: rgba(46,160,67,0.1); color: var(--accent-light); padding: 6px 4px;
   text-align: left; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
@@ -427,12 +427,12 @@ img { max-width: 100%; display: block; }
           </div>
           <div class="form-row">
             <div class="form-group"><label>Location</label><input type="text" id="location" value=""></div>
-            <div class="form-group"><label>Contract No.</label><input type="text" id="contractNo" value=""></div>
+            <div class="form-group"><label>JOB CODE</label><input type="text" id="contractNo" value=""></div>
           </div>
           <div class="form-group" style="margin-bottom:10px"><label>Service Provided (one per line)</label><textarea id="serviceProvided" rows="2"></textarea></div>
           <div class="form-row">
             <div class="form-group"><label>Month</label>
-              <select id="reportMonth">
+              <select id="reportMonth" onchange="debouncedRefresh()">
                 <option value="">Select</option>
                 <option>January</option><option>February</option><option>March</option><option>April</option>
                 <option>May</option><option>June</option><option>July</option><option>August</option>
@@ -449,6 +449,7 @@ img { max-width: 100%; display: block; }
         <div class="section-header" onclick="toggleSection('sec-annual')">
           <h2><span class="dot"></span>Annual Maintenance Plan</h2>
           <div class="section-header-right">
+            <label class="section-toggle" style="margin-right:8px" onclick="event.stopPropagation()"><input type="checkbox" id="highlight-month-chk" checked onchange="debouncedRefresh()"> Highlight Month</label>
             <label class="section-toggle" onclick="event.stopPropagation()"><input type="checkbox" id="inc-sec-annual" checked onchange="debouncedRefresh()"> Include</label>
             <span class="section-chevron">▼</span>
           </div>
@@ -1079,6 +1080,7 @@ function gatherData() {
   data.includes = {
     details: document.getElementById('inc-sec-details').checked,
     annual: document.getElementById('inc-sec-annual').checked,
+    highlightMonth: document.getElementById('highlight-month-chk').checked,
     ops: document.getElementById('inc-sec-ops').checked,
     extra: document.getElementById('inc-sec-extra').checked,
     reactive: document.getElementById('inc-sec-reactive').checked,
@@ -1121,8 +1123,8 @@ function refreshPreview() {
     textContent += `<table class="detail-table">
       <tr><td class="label-cell" style="width:100px">Client</td><td class="value-cell" colspan="1">${esc(data.client)}</td>
           <td class="label-cell">Facilities Management</td><td class="value-cell">${esc(data.facilitiesMgmt)}</td></tr>
-      <tr><td class="label-cell">Location</td><td class="value-cell" colspan="2">${esc(data.location)}</td>
-          <td class="value-cell">${esc(data.contractNo)}</td></tr>
+      <tr><td class="label-cell">Location</td><td class="value-cell">${esc(data.location)}</td>
+          <td class="label-cell">JOB CODE</td><td class="value-cell">${esc(data.contractNo)}</td></tr>
       <tr><td class="label-cell">Service Provided</td><td class="value-cell">${services || '&mdash;'}</td>
           <td class="label-cell">Month</td><td class="value-cell">${esc(data.reportMonth)} ${esc(data.reportYear)}</td></tr>
     </table>`;
@@ -1134,11 +1136,20 @@ function refreshPreview() {
     textContent += `<table class="plan-table"><thead><tr>
       <th>Activities</th><th>Frequency</th>`;
     const MONTHS = ['Jan.','Feb.','Mar.','April','May','June','July','Aug.','Sep.','Oct.','Nov.','Dec.'];
-    MONTHS.forEach(m => { textContent += `<th>${m}</th>`; });
+    const FULL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const selectedMonthIdx = data.highlightMonth ? FULL_MONTHS.indexOf(data.reportMonth) : -1;
+    
+    MONTHS.forEach((m, idx) => { 
+      const style = (idx === selectedMonthIdx) ? ' style="background:#ffeb3b"' : '';
+      textContent += `<th${style}>${m}</th>`; 
+    });
     textContent += `</tr></thead><tbody>`;
     data.annualActivities.forEach(a => {
       textContent += `<tr><td>${esc(a.name)}</td><td>${esc(a.freq)}</td>`;
-      a.months.forEach(m => { textContent += `<td class="check-cell">${m ? '✓' : ''}</td>`; });
+      a.months.forEach((m, idx) => { 
+        const style = (idx === selectedMonthIdx) ? ' style="background:#fff9c4"' : '';
+        textContent += `<td class="check-cell"${style}>${m ? '✓' : ''}</td>`; 
+      });
       textContent += `</tr>`;
     });
     textContent += `</tbody></table>`;
@@ -1320,7 +1331,7 @@ function exportExcel() {
     const services = data.serviceProvided.split('\\n').filter(s => s.trim()).join('<br>');
     excelHTML += `<table border="1">
       <tr><td style="background:#f2f2f2"><b>Client</b></td><td>${esc(data.client)}</td><td style="background:#f2f2f2"><b>Facilities Management</b></td><td>${esc(data.facilitiesMgmt)}</td></tr>
-      <tr><td style="background:#f2f2f2"><b>Location</b></td><td colspan="2">${esc(data.location)}</td><td>${esc(data.contractNo)}</td></tr>
+      <tr><td style="background:#f2f2f2"><b>Location</b></td><td>${esc(data.location)}</td><td style="background:#f2f2f2"><b>JOB CODE</b></td><td>${esc(data.contractNo)}</td></tr>
       <tr><td style="background:#f2f2f2"><b>Service Provided</b></td><td>${services}</td><td style="background:#f2f2f2"><b>Month</b></td><td>${esc(data.reportMonth)} ${esc(data.reportYear)}</td></tr>
     </table><br>`;
   }
@@ -1330,11 +1341,20 @@ function exportExcel() {
     excelHTML += `<h4>${esc(data.annualPlanTitle)}</h4>`;
     excelHTML += `<table border="1"><thead><tr><th style="background:#d9e2f3">Activities</th><th style="background:#d9e2f3">Frequency</th>`;
     const MONTHS = ['Jan.','Feb.','Mar.','April','May','June','July','Aug.','Sep.','Oct.','Nov.','Dec.'];
-    MONTHS.forEach(m => { excelHTML += `<th style="background:#d9e2f3">${m}</th>`; });
+    const FULL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const selectedMonthIdx = data.highlightMonth ? FULL_MONTHS.indexOf(data.reportMonth) : -1;
+
+    MONTHS.forEach((m, idx) => { 
+      const bg = (idx === selectedMonthIdx) ? '#ffeb3b' : '#d9e2f3';
+      excelHTML += `<th style="background:${bg}">${m}</th>`; 
+    });
     excelHTML += `</tr></thead><tbody>`;
     data.annualActivities.forEach(a => {
       excelHTML += `<tr><td>${esc(a.name)}</td><td>${esc(a.freq)}</td>`;
-      a.months.forEach(m => { excelHTML += `<td style="text-align:center;color:#0e6b0e">${m ? '✓' : ''}</td>`; });
+      a.months.forEach((m, idx) => { 
+        const bg = (idx === selectedMonthIdx) ? '#fff9c4' : '';
+        excelHTML += `<td style="text-align:center;color:#0e6b0e;background:${bg}">${m ? '✓' : ''}</td>`; 
+      });
       excelHTML += `</tr>`;
     });
     excelHTML += `</tbody></table><br>`;
@@ -1418,6 +1438,17 @@ function exportExcel() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ===== EXPORT PDF =====
+function exportPDF() {
+  // Ensure the preview is up to date before printing
+  debouncedRefresh();
+  
+  // A slight delay ensures images and DOM updates are fully rendered before the print dialog opens
+  setTimeout(() => {
+    window.print();
+  }, 300);
 }
 
 // ===== TOAST =====
