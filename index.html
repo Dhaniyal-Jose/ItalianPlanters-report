@@ -206,6 +206,35 @@ img { max-width: 100%; display: block; }
 }
 .photo-card:hover .remove-photo { opacity: 1; }
 
+/* ===== PHOTO LOCATION CARDS ===== */
+.photo-location-card {
+  background: var(--bg-input); border: 1px solid var(--border-color); border-radius: var(--radius-lg);
+  padding: 12px; margin-bottom: 10px; position: relative; transition: all var(--transition);
+}
+.photo-location-card:hover { border-color: var(--text-muted); }
+.photo-location-card .location-header {
+  display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+}
+.photo-location-card .location-header .loc-number {
+  background: var(--accent); color: #fff; width: 22px; height: 22px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700;
+  flex-shrink: 0;
+}
+.photo-location-card .location-header input {
+  flex: 1; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: var(--radius);
+  padding: 7px 10px; color: var(--text-primary); font-size: 12px; font-weight: 500;
+}
+.photo-location-card .location-header input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px var(--accent-glow); }
+.photo-location-card .location-header input::placeholder { color: var(--text-muted); }
+.photo-location-card .remove-location {
+  background: transparent; color: var(--danger); border: 1px solid rgba(248,81,73,0.3); padding: 4px 8px;
+  font-size: 11px; border-radius: var(--radius); cursor: pointer; flex-shrink: 0; transition: all var(--transition);
+}
+.photo-location-card .remove-location:hover { background: rgba(248,81,73,0.1); }
+.photo-location-card .photo-upload-zone { padding: 16px; margin-bottom: 8px; }
+.photo-location-card .photo-upload-zone .icon { font-size: 24px; margin-bottom: 4px; }
+.photo-location-card .photo-upload-zone p { font-size: 11px; }
+
 /* ===== PREVIEW PANEL ===== */
 .preview-panel {
   flex: 1; background: #1a1a2e; overflow-y: auto; padding: 30px; display: flex;
@@ -380,8 +409,7 @@ img { max-width: 100%; display: block; }
     <div class="editor-header">
       <h1><span class="icon">🌿</span> Report Generator</h1>
       <div class="editor-actions">
-        <button class="btn btn-outline btn-sm" onclick="refreshPreview()">↻ Refresh</button>
-        <button class="btn btn-primary" style="background:#107c41; box-shadow:0 0 20px rgba(16,124,65,0.3)" onclick="exportExcel()">⬇ Export Excel</button>
+        <button class="btn btn-primary" style="background:#2b579a; box-shadow:0 0 20px rgba(43,87,154,0.3)" onclick="exportWord()">⬇ Export Word</button>
         <button class="btn btn-primary" onclick="exportPDF()">⬇ Export PDF</button>
       </div>
     </div>
@@ -626,12 +654,8 @@ img { max-width: 100%; display: block; }
             <label>Rows per page</label>
             <input type="number" id="customRows" min="1" max="8" value="3" onchange="debouncedRefresh()">
           </div>
-          <div class="photo-upload-zone" id="photoZone" onclick="document.getElementById('photoInput').click()">
-            <input type="file" id="photoInput" accept="image/*" multiple>
-            <div class="icon">📸</div>
-            <p>Click or drag & drop photos here<br><span style="font-size:10px;color:var(--text-muted)">Supports bulk upload • JPG, PNG</span></p>
-          </div>
-          <div class="photo-grid-editor" id="photoGrid"></div>
+          <div id="photoLocationsContainer"></div>
+          <button class="add-row-btn" onclick="addPhotoLocation()" style="margin-top:8px">+ Add Location</button>
         </div>
       </div>
 
@@ -716,7 +740,7 @@ const DEFAULT_ACTIVITIES = [
 // ===== STATE =====
 let state = {
   logo: null,
-  photos: [], // { id, dataUrl, caption }
+  photoLocations: [{ heading: '', photos: [] }],
   gridLayout: '4x3',
   extraTasks: [{ text: 'N/A' }],
   reactiveTasks: [{ text: 'N/A' }],
@@ -740,6 +764,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderConstraints();
   renderContacts();
   renderOshTopics();
+  renderPhotoLocations();
   setupDragDrop();
   setupInputListeners();
   refreshPreview();
@@ -924,32 +949,76 @@ function renderOshTopics() {
 }
 function addOshTopic() { state.oshTopics.push(''); renderOshTopics(); }
 
-// ===== PHOTO UPLOAD =====
-const photoZone = document.getElementById('photoZone');
-const photoInput = document.getElementById('photoInput');
-photoInput.addEventListener('change', (e) => handlePhotoFiles(e.target.files));
-photoZone.addEventListener('dragover', (e) => { e.preventDefault(); photoZone.classList.add('dragover'); });
-photoZone.addEventListener('dragleave', () => photoZone.classList.remove('dragover'));
-photoZone.addEventListener('drop', (e) => { e.preventDefault(); photoZone.classList.remove('dragover'); handlePhotoFiles(e.dataTransfer.files); });
+// ===== PHOTO LOCATIONS =====
+function addPhotoLocation() {
+  state.photoLocations.push({ heading: '', photos: [] });
+  renderPhotoLocations();
+  debouncedRefresh();
+}
 
-function handlePhotoFiles(files) {
+function removePhotoLocation(locIdx) {
+  if (state.photoLocations.length <= 1) return;
+  state.photoLocations.splice(locIdx, 1);
+  renderPhotoLocations();
+  debouncedRefresh();
+}
+
+function renderPhotoLocations() {
+  const container = document.getElementById('photoLocationsContainer');
+  container.innerHTML = '';
+  state.photoLocations.forEach((loc, locIdx) => {
+    const card = document.createElement('div');
+    card.className = 'photo-location-card';
+    card.innerHTML = `
+      <div class="location-header">
+        <span class="loc-number">${locIdx + 1}</span>
+        <input type="text" placeholder="Location heading (e.g. Main Entrance Garden)" value="${loc.heading}"
+               onchange="state.photoLocations[${locIdx}].heading=this.value;debouncedRefresh()">
+        ${state.photoLocations.length > 1 ? `<button class="remove-location" onclick="removePhotoLocation(${locIdx})">✕ Remove</button>` : ''}
+      </div>
+      <div class="photo-upload-zone" id="photoZone_${locIdx}" onclick="document.getElementById('photoInput_${locIdx}').click()">
+        <input type="file" id="photoInput_${locIdx}" accept="image/*" multiple>
+        <div class="icon">📸</div>
+        <p>Click or drag & drop photos here<br><span style="font-size:10px;color:var(--text-muted)">Supports bulk upload • JPG, PNG</span></p>
+      </div>
+      <div class="photo-grid-editor" id="photoGrid_${locIdx}"></div>
+    `;
+    container.appendChild(card);
+
+    // Setup file input and drag/drop for this location
+    const zone = card.querySelector(`#photoZone_${locIdx}`);
+    const input = card.querySelector(`#photoInput_${locIdx}`);
+    input.addEventListener('change', (e) => handleLocationPhotoFiles(locIdx, e.target.files));
+    zone.addEventListener('dragover', (e) => { e.preventDefault(); zone.classList.add('dragover'); });
+    zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+    zone.addEventListener('drop', (e) => { e.preventDefault(); zone.classList.remove('dragover'); handleLocationPhotoFiles(locIdx, e.dataTransfer.files); });
+
+    // Render existing photos for this location
+    renderLocationPhotoGrid(locIdx);
+  });
+}
+
+function handleLocationPhotoFiles(locIdx, files) {
   Array.from(files).forEach(file => {
     if (!file.type.startsWith('image/')) return;
     const reader = new FileReader();
     reader.onload = (e) => {
-      state.photos.push({ id: ++photoIdCounter, dataUrl: e.target.result, caption: '' });
-      renderPhotoGrid();
+      state.photoLocations[locIdx].photos.push({ id: ++photoIdCounter, dataUrl: e.target.result, caption: '' });
+      renderLocationPhotoGrid(locIdx);
       debouncedRefresh();
     };
     reader.readAsDataURL(file);
   });
-  photoInput.value = '';
+  const input = document.getElementById(`photoInput_${locIdx}`);
+  if (input) input.value = '';
 }
 
-function renderPhotoGrid() {
-  const grid = document.getElementById('photoGrid');
+function renderLocationPhotoGrid(locIdx) {
+  const grid = document.getElementById(`photoGrid_${locIdx}`);
+  if (!grid) return;
   grid.innerHTML = '';
-  state.photos.forEach((p, i) => {
+  const photos = state.photoLocations[locIdx].photos;
+  photos.forEach((p, i) => {
     const card = document.createElement('div');
     card.className = 'photo-card';
     card.draggable = true;
@@ -958,14 +1027,14 @@ function renderPhotoGrid() {
       `<option value="${c}" ${p.caption === c ? 'selected' : ''}>${c || '-- Select predefined --'}</option>`
     ).join('');
     card.innerHTML = `
-      <button class="remove-photo" onclick="removePhoto(${p.id})">✕</button>
+      <button class="remove-photo" onclick="removeLocationPhoto(${locIdx}, ${p.id})">✕</button>
       <img src="${p.dataUrl}" alt="Photo ${i+1}">
       <div class="photo-caption">
-        <select onchange="updateCaption(${p.id}, this.value, this.closest('.photo-card'))">${captionOptions}</select>
-        <input type="text" placeholder="Custom caption..." value="${p.caption}" onchange="updateCaptionDirect(${p.id}, this.value)">
+        <select onchange="updateLocationCaption(${locIdx}, ${p.id}, this.value, this.closest('.photo-card'))">${captionOptions}</select>
+        <input type="text" placeholder="Custom caption..." value="${p.caption}" onchange="updateLocationCaptionDirect(${locIdx}, ${p.id}, this.value)">
       </div>
     `;
-    // Drag & drop reorder
+    // Drag & drop reorder within location
     card.addEventListener('dragstart', (e) => { e.dataTransfer.setData('text/plain', i); card.style.opacity = '0.4'; });
     card.addEventListener('dragend', () => { card.style.opacity = '1'; });
     card.addEventListener('dragover', (e) => { e.preventDefault(); card.style.borderColor = 'var(--accent)'; });
@@ -974,23 +1043,23 @@ function renderPhotoGrid() {
       e.preventDefault(); card.style.borderColor = '';
       const from = parseInt(e.dataTransfer.getData('text/plain'));
       const to = i;
-      if (from !== to) { const item = state.photos.splice(from, 1)[0]; state.photos.splice(to, 0, item); renderPhotoGrid(); debouncedRefresh(); }
+      if (from !== to) { const item = photos.splice(from, 1)[0]; photos.splice(to, 0, item); renderLocationPhotoGrid(locIdx); debouncedRefresh(); }
     });
     grid.appendChild(card);
   });
 }
 
-function updateCaption(id, val, card) {
-  const photo = state.photos.find(p => p.id === id);
+function updateLocationCaption(locIdx, id, val, card) {
+  const photo = state.photoLocations[locIdx].photos.find(p => p.id === id);
   if (photo) { photo.caption = val; card.querySelector('input[type="text"]').value = val; debouncedRefresh(); }
 }
-function updateCaptionDirect(id, val) {
-  const photo = state.photos.find(p => p.id === id);
+function updateLocationCaptionDirect(locIdx, id, val) {
+  const photo = state.photoLocations[locIdx].photos.find(p => p.id === id);
   if (photo) { photo.caption = val; debouncedRefresh(); }
 }
-function removePhoto(id) {
-  state.photos = state.photos.filter(p => p.id !== id);
-  renderPhotoGrid(); debouncedRefresh();
+function removeLocationPhoto(locIdx, id) {
+  state.photoLocations[locIdx].photos = state.photoLocations[locIdx].photos.filter(p => p.id !== id);
+  renderLocationPhotoGrid(locIdx); debouncedRefresh();
 }
 
 // ===== GRID SELECTOR =====
@@ -1063,7 +1132,7 @@ function gatherData() {
   data.footerAddress = document.getElementById('footerAddress').value;
   data.footerEmail = document.getElementById('footerEmail').value;
   data.logo = state.logo;
-  data.photos = state.photos;
+  data.photoLocations = state.photoLocations;
   data.gridLayout = state.gridLayout;
 
   // Annual plan rows
@@ -1127,11 +1196,33 @@ function refreshPreview() {
     </div>
   </div>`;
 
-  const footerHTML = `<div class="report-footer">
+  // Calculate layout parameters first for correct page numbering
+  let cols, rowsPerPage;
+  if (data.gridLayout === '3x3') { cols = 3; rowsPerPage = 3; } 
+  else if (data.gridLayout === 'custom') {
+    cols = parseInt(document.getElementById('customCols').value) || 4;
+    rowsPerPage = parseInt(document.getElementById('customRows').value) || 3;
+    cols = Math.max(1, Math.min(6, cols));
+    rowsPerPage = Math.max(1, Math.min(8, rowsPerPage));
+  } else { cols = 4; rowsPerPage = 3; }
+  const photosPerPage = cols * rowsPerPage;
+
+  const allPhotos = data.photoLocations.flatMap(loc => loc.photos);
+  let photoPageCount = 0;
+  if (data.includes.photos && allPhotos.length > 0) {
+    data.photoLocations.forEach((loc) => {
+      if (loc.photos.length === 0) return;
+      photoPageCount += Math.ceil(loc.photos.length / photosPerPage);
+    });
+  }
+  const totalPages = 1 + photoPageCount;
+
+  const getFooterHTML = (pageNum) => `<div class="report-footer">
     <span>${esc(data.docCode)}</span>
     <span>Revision: ${esc(data.revision)}</span>
     <span>${esc(data.footerAddress)}</span>
     <span>${esc(data.footerEmail)}</span>
+    <span style="font-weight:bold;color:#333">Page ${pageNum} of ${totalPages}</span>
   </div>`;
 
   // === TEXT SECTION ===
@@ -1241,76 +1332,82 @@ function refreshPreview() {
         <thead><tr><td>${headerHTML}</td></tr></thead>
         <tbody><tr><td>
           ${textContent}
-          ${(data.photos.length === 0 || !data.includes.photos) && data.includes.signature ? renderSignature(data) : ''}
+          ${(allPhotos.length === 0 || !data.includes.photos) && data.includes.signature ? renderSignature(data) : ''}
         </td></tr></tbody>
-        <tfoot><tr><td>${footerHTML}</td></tr></tfoot>
+        <tfoot><tr><td>${getFooterHTML(1)}</td></tr></tfoot>
       </table>
     </div>
   `;
 
-  // 2. PHOTO BLOCKS
-  let cols, rowsPerPage;
-  if (data.gridLayout === '3x3') { cols = 3; rowsPerPage = 3; } 
-  else if (data.gridLayout === 'custom') {
-    cols = parseInt(document.getElementById('customCols').value) || 4;
-    rowsPerPage = parseInt(document.getElementById('customRows').value) || 3;
-    cols = Math.max(1, Math.min(6, cols));
-    rowsPerPage = Math.max(1, Math.min(8, rowsPerPage));
-  } else { cols = 4; rowsPerPage = 3; }
-  
-  const photosPerPage = cols * rowsPerPage;
-
+  // 2. PHOTO BLOCKS - grouped by location
   const availableHeight = 277 - 18 - 10;
   const headingHeight = 8;
   const captionRowHeight = 5;
   const usableHeight = availableHeight - headingHeight - (rowsPerPage * captionRowHeight);
   const photoRowHeight = Math.floor(usableHeight / rowsPerPage);
 
-  if (data.includes.photos && data.photos.length > 0) {
-    for (let start = 0; start < data.photos.length; start += photosPerPage) {
-      
-      
-      
-      let photoContent = '';
-      if (start === 0) {
-        photoContent += `<div class="report-section-heading" style="margin-bottom:4px">${esc(data.photosTitle)}</div>`;
-      }
-      
-      photoContent += `<table class="photo-grid-table" style="--photo-row-height:${photoRowHeight}mm">`;
-      const pagePhotos = data.photos.slice(start, start + photosPerPage);
-      for (let r = 0; r < rowsPerPage; r++) {
-        const rowPhotos = pagePhotos.slice(r * cols, (r + 1) * cols);
-        if (rowPhotos.length === 0) break;
-        photoContent += '<tr>';
-        for (let c2 = 0; c2 < cols; c2++) {
-          if (rowPhotos[c2]) {
-            photoContent += `<td class="photo-cell" style="width:${(100/cols).toFixed(2)}%"><img src="${rowPhotos[c2].dataUrl}" alt=""></td>`;
-          } else {
-            photoContent += `<td class="photo-cell" style="width:${(100/cols).toFixed(2)}%"></td>`;
+  let currentPage = 2;
+  if (data.includes.photos && allPhotos.length > 0) {
+    let isFirstPhotoPage = true;
+    const totalLocations = data.photoLocations.length;
+
+    data.photoLocations.forEach((loc, locIndex) => {
+      if (loc.photos.length === 0) return;
+      const isLastLocation = (locIndex === totalLocations - 1) || 
+        data.photoLocations.slice(locIndex + 1).every(l => l.photos.length === 0);
+
+      for (let start = 0; start < loc.photos.length; start += photosPerPage) {
+        let photoContent = '';
+        
+        // Show main section title on very first photo page
+        if (isFirstPhotoPage) {
+          photoContent += `<div class="report-section-heading" style="margin-bottom:4px">${esc(data.photosTitle)}</div>`;
+          isFirstPhotoPage = false;
+        }
+
+        // Show location heading at start of each location's photos
+        if (start === 0 && loc.heading) {
+          photoContent += `<div style="font-family:Calibri,sans-serif;font-size:12pt;font-weight:bold;text-align:center;padding:4px 0 2px;margin-bottom:4px;color:#1a5e1f">${esc(loc.heading)}</div>`;
+        }
+        
+        photoContent += `<table class="photo-grid-table" style="--photo-row-height:${photoRowHeight}mm">`;
+        const pagePhotos = loc.photos.slice(start, start + photosPerPage);
+        for (let r = 0; r < rowsPerPage; r++) {
+          const rowPhotos = pagePhotos.slice(r * cols, (r + 1) * cols);
+          if (rowPhotos.length === 0) break;
+          photoContent += '<tr>';
+          for (let c2 = 0; c2 < cols; c2++) {
+            if (rowPhotos[c2]) {
+              photoContent += `<td class="photo-cell" style="width:${(100/cols).toFixed(2)}%"><img src="${rowPhotos[c2].dataUrl}" alt=""></td>`;
+            } else {
+              photoContent += `<td class="photo-cell" style="width:${(100/cols).toFixed(2)}%"></td>`;
+            }
           }
+          photoContent += '</tr><tr>';
+          for (let c2 = 0; c2 < cols; c2++) {
+            photoContent += `<td class="caption-cell">${rowPhotos[c2] ? esc(rowPhotos[c2].caption) : ''}</td>`;
+          }
+          photoContent += '</tr>';
         }
-        photoContent += '</tr><tr>';
-        for (let c2 = 0; c2 < cols; c2++) {
-          photoContent += `<td class="caption-cell">${rowPhotos[c2] ? esc(rowPhotos[c2].caption) : ''}</td>`;
+        photoContent += `</table>`;
+
+        // Add signature on the very last photo page of the last location
+        if (isLastLocation && start + photosPerPage >= loc.photos.length && data.includes.signature) {
+          photoContent += renderSignature(data);
         }
-        photoContent += '</tr>';
-      }
-      photoContent += `</table>`;
 
-      if (start + photosPerPage >= data.photos.length && data.includes.signature) {
-        photoContent += renderSignature(data);
+        fullHTML += `
+          <div class="report-page" style="page-break-before: always;">
+            <table class="print-table">
+              <thead><tr><td>${headerHTML}</td></tr></thead>
+              <tbody><tr><td>${photoContent}</td></tr></tbody>
+              <tfoot><tr><td>${getFooterHTML(currentPage)}</td></tr></tfoot>
+            </table>
+          </div>
+        `;
+        currentPage++;
       }
-
-      fullHTML += `
-        <div class="report-page" style="page-break-before: always;">
-          <table class="print-table">
-            <thead><tr><td>${headerHTML}</td></tr></thead>
-            <tbody><tr><td>${photoContent}</td></tr></tbody>
-            <tfoot><tr><td>${footerHTML}</td></tr></tfoot>
-          </table>
-        </div>
-      `;
-    }
+    });
   }
   container.innerHTML = fullHTML;
   highlightUITable();
@@ -1369,10 +1466,270 @@ function esc(str) {
   return div.innerHTML;
 }
 
+// ===== EXPORT WORD =====
+function exportWord() {
+  showToast('📄 Generating Word document...');
+  const data = gatherData();
+  
+  const boundary = "----NextPart_ReportBound";
+  const attachments = [];
+  
+  // Attach logo if present
+  let logoCid = "";
+  if (data.logo) {
+    const match = data.logo.match(/^data:([^;]+);base64,(.+)$/);
+    if (match) {
+      logoCid = "logo_img";
+      attachments.push({ cid: logoCid, mime: match[1], base64: match[2] });
+    }
+  }
+
+  let wordHTML = `
+    <html xmlns:o="urn:schemas-microsoft-com:office:office"
+          xmlns:w="urn:schemas-microsoft-com:office:word"
+          xmlns="http://www.w3.org/TR/REC-html40">
+    <head>
+    <meta charset="utf-8">
+    <xml>
+      <w:WordDocument>
+        <w:View>Print</w:View>
+        <w:Zoom>100</w:Zoom>
+        <w:DoNotOptimizeForBrowser/>
+      </w:WordDocument>
+    </xml>
+    <style>
+      @page { size: 210mm 297mm; margin: 12mm 12mm 12mm 12mm; }
+      body { font-family: Cambria, Georgia, serif; font-size: 10pt; color: #000; }
+      table { border-collapse: collapse; width: 100%; }
+      th, td { padding: 4px 6px; vertical-align: top; }
+      h1 { font-size: 16pt; color: #1a5e1f; margin: 0 0 2px 0; }
+      h2 { font-size: 11pt; color: #000; background: #001d3d; color: #fff; padding: 4px 8px; margin: 12px 0 4px 0; }
+      h3 { font-family: Calibri, sans-serif; font-size: 12pt; font-weight: bold; color: #1a5e1f; text-align: center; margin: 8px 0 4px 0; }
+      .header-bar { border-bottom: 3px solid; border-image: linear-gradient(to right, #b5cc18, #0e8a7d, #1a6fb5, #7b2d8e, #e91e63) 1; padding-bottom: 6px; margin-bottom: 8px; }
+      .detail-table td { border: 1px solid #999; padding: 4px 8px; font-size: 9pt; }
+      .detail-table .label { background: #f2f2f2; font-weight: bold; width: 120px; }
+      .plan-table th { background: #001d3d; color: #fff; font-size: 8pt; padding: 3px 4px; border: 1px solid #666; }
+      .plan-table td { border: 1px solid #999; font-size: 8pt; padding: 2px 4px; text-align: center; }
+      .plan-table td:first-child, .plan-table td:nth-child(2) { text-align: left; }
+      .task-table th { background: #d9e2f3; font-size: 9pt; border: 1px solid #999; padding: 3px 6px; }
+      .task-table td { border: 1px solid #999; font-size: 9pt; padding: 3px 6px; }
+      .sig-table td { border: 1px solid #999; padding: 4px 8px; font-size: 9pt; }
+      .sig-table .label { background: #f2f2f2; font-weight: bold; width: 120px; }
+      .photo-table { margin-top: 4px; }
+      .photo-table td { border: 1px solid #ccc; text-align: center; padding: 4px; vertical-align: middle; }
+      .photo-table .caption { font-size: 8pt; color: #333; font-style: italic; padding: 2px 4px; }
+      ul.osh { margin: 4px 0 4px 20px; font-size: 9pt; }
+    ` + `</style>` + `
+    ` + `</head>` + `
+    <body>
+  `;
+
+  // Header
+  wordHTML += `<div class="header-bar">`;
+  if (logoCid) {
+    wordHTML += `<img src="cid:${logoCid}" style="height:40px;margin-bottom:4px" /><br>`;
+  }
+  wordHTML += `<h1>${esc(data.companyName)}</h1>`;
+  wordHTML += `<div style="font-size:9pt;color:#333">${esc(data.tagline)}</div>`;
+  if (data.certifications) wordHTML += `<div style="font-size:7pt;color:#666">${esc(data.certifications)}</div>`;
+  wordHTML += `</div>`;
+
+  // Report Title
+  wordHTML += `<div style="text-align:center;border:1px solid #000;padding:4px;margin-bottom:8px;font-weight:bold;font-size:11pt">${esc(data.reportTitle)}</div>`;
+
+  // Details
+  if (data.includes.details) {
+    const services = data.serviceProvided.split('\\n').filter(s => s.trim()).join('<br>');
+    wordHTML += `<table class="detail-table">
+      <tr><td class="label">Client</td><td>${esc(data.client)}</td><td class="label">Facilities Management</td><td>${esc(data.facilitiesMgmt)}</td></tr>
+      <tr><td class="label">Location</td><td>${esc(data.location)}</td><td class="label">JOB CODE</td><td>${esc(data.contractNo)}</td></tr>
+      <tr><td class="label">Service Provided</td><td>${services || '&mdash;'}</td><td class="label">Month</td><td>${esc(data.reportMonth)} ${esc(data.reportYear)}</td></tr>
+    </table>`;
+  }
+
+  // Annual Plan
+  if (data.includes.annual) {
+    wordHTML += `<h2>${esc(data.annualPlanTitle)}</h2>`;
+    wordHTML += `<table class="plan-table"><tr><th>Activities</th><th>Frequency</th>`;
+    const MONTHS = ['Jan.','Feb.','Mar.','April','May','June','July','Aug.','Sep.','Oct.','Nov.','Dec.'];
+    const FULL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const selectedMonthIdx = data.includes.highlightMonth ? FULL_MONTHS.indexOf(data.annualHighlightMonth) : -1;
+    MONTHS.forEach((m, idx) => {
+      const bg = (idx === selectedMonthIdx) ? 'background:#001d3d;color:#fff' : '';
+      wordHTML += `<th style="${bg}">${m}</th>`;
+    });
+    wordHTML += `</tr>`;
+    data.annualActivities.forEach(a => {
+      wordHTML += `<tr><td>${esc(a.name)}</td><td>${esc(a.freq)}</td>`;
+      a.months.forEach((m, idx) => {
+        const isHl = (idx === selectedMonthIdx && m);
+        const style = isHl ? 'background:#001d3d;color:#fff' : 'color:#0e6b0e';
+        wordHTML += `<td style="${style}">${m ? '●' : ''}</td>`;
+      });
+      wordHTML += `</tr>`;
+    });
+    wordHTML += `</table>`;
+  }
+
+  // PPM Tasks
+  if (data.includes.ops) {
+    wordHTML += `<h2>${esc(data.opsTitle)}</h2>`;
+    wordHTML += `<div style="font-size:8pt;padding:3px 0;border:1px solid #000;border-top:0;padding-left:4px">${esc(data.ppmSubtitle)}</div>`;
+    wordHTML += `<table class="task-table"><tr><th>Activity</th><th>Frequency</th><th>Complete (✓)</th><th>Pending (✗)</th><th>Remarks</th></tr>`;
+    data.ppmTasks.forEach(t => {
+      wordHTML += `<tr><td>${esc(t.name)}</td><td style="text-align:center">${esc(t.freq)}</td>
+        <td style="text-align:center;color:#0e6b0e">${t.done ? '✓' : ''}</td>
+        <td style="text-align:center;color:#c00">${t.pending ? '✗' : ''}</td>
+        <td>${esc(t.remarks)}</td></tr>`;
+    });
+    wordHTML += `</table>`;
+  }
+
+  // Extra Tasks
+  if (data.includes.extra) {
+    wordHTML += `<h2>${esc(data.extraTitle)}</h2>`;
+    wordHTML += `<table class="task-table"><tr><th style="width:30px">S/N</th><th>Description</th></tr>`;
+    data.extraTasks.forEach((t, i) => { wordHTML += `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${esc(t.text)}</td></tr>`; });
+    wordHTML += `</table>`;
+  }
+
+  // Reactive Tasks
+  if (data.includes.reactive) {
+    wordHTML += `<h2>${esc(data.reactiveTitle)}</h2>`;
+    wordHTML += `<table class="task-table"><tr><th style="width:30px">S/N</th><th>Description</th></tr>`;
+    data.reactiveTasks.forEach((t, i) => { wordHTML += `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${esc(t.text)}</td></tr>`; });
+    wordHTML += `</table>`;
+  }
+
+  // Constraints
+  if (data.includes.constraints) {
+    wordHTML += `<h2>${esc(data.constraintsTitle)}</h2>`;
+    wordHTML += `<table class="task-table"><tr><th style="width:30px">S/N</th><th>Incident Description</th><th style="width:70px">Status</th></tr>`;
+    data.constraints.forEach((c, i) => { wordHTML += `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${esc(c.desc)}</td><td>${esc(c.status)}</td></tr>`; });
+    wordHTML += `</table>`;
+  }
+
+  // Contacts
+  if (data.includes.contacts) {
+    wordHTML += `<h2>${esc(data.contactsTitle)}</h2>`;
+    wordHTML += `<table class="task-table"><tr><th>Role</th><th>Name</th><th>Phone</th><th>Email</th></tr>`;
+    data.contacts.forEach(c => { wordHTML += `<tr><td>${esc(c.role)}</td><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td>${esc(c.email)}</td></tr>`; });
+    wordHTML += `</table>`;
+  }
+
+  // OSH Training
+  if (data.includes.osh) {
+    wordHTML += `<h2>${esc(data.oshTitle)}</h2>`;
+    wordHTML += `<ul class="osh">`;
+    data.oshTopics.forEach(t => { wordHTML += `<li>${esc(t)}</li>`; });
+    wordHTML += `</ul>`;
+  }
+
+  // Photos by location
+  const wordAllPhotos = data.photoLocations.flatMap(loc => loc.photos);
+  if (data.includes.photos && wordAllPhotos.length > 0) {
+    wordHTML += `<h2>${esc(data.photosTitle)}</h2>`;
+    
+    let cols;
+    if (data.gridLayout === '3x3') { cols = 3; }
+    else if (data.gridLayout === 'custom') { cols = Math.max(1, Math.min(6, parseInt(document.getElementById('customCols').value) || 4)); }
+    else { cols = 4; }
+    const colWidth = Math.floor(100 / cols);
+
+    const imgWidth = Math.floor(620 / cols);
+    const imgHeight = Math.floor(imgWidth * 0.75);
+
+    data.photoLocations.forEach((loc, locIdx) => {
+      if (loc.photos.length === 0) return;
+      if (loc.heading) {
+        wordHTML += `<h3>${esc(loc.heading)}</h3>`;
+      }
+      wordHTML += `<table class="photo-table" style="table-layout:fixed;width:100%;border-collapse:collapse;margin-top:4px">`;
+      for (let i = 0; i < loc.photos.length; i += cols) {
+        const row = loc.photos.slice(i, i + cols);
+        // Photo row
+        wordHTML += `<tr>`;
+        for (let c = 0; c < cols; c++) {
+          if (row[c]) {
+            const photoMatch = row[c].dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (photoMatch) {
+              const cid = `word_photo_${locIdx}_${i + c}`;
+              attachments.push({ cid: cid, mime: photoMatch[1], base64: photoMatch[2] });
+              wordHTML += `<td style="width:${colWidth}%;height:${imgHeight + 10}px;border:1px solid #ccc;text-align:center;padding:4px;vertical-align:middle"><img src="cid:${cid}" width="${imgWidth}" height="${imgHeight}" style="display:block;margin:0 auto" /></td>`;
+            } else {
+              wordHTML += `<td style="width:${colWidth}%;height:${imgHeight + 10}px;border:1px solid #ccc;text-align:center;vertical-align:middle"></td>`;
+            }
+          } else {
+            wordHTML += `<td style="width:${colWidth}%;border:1px solid #ccc;text-align:center;vertical-align:middle"></td>`;
+          }
+        }
+        wordHTML += `</tr>`;
+        // Caption row
+        wordHTML += `<tr>`;
+        for (let c = 0; c < cols; c++) {
+          wordHTML += `<td style="border:1px solid #ccc;font-size:8pt;color:#333;font-style:italic;padding:2px 4px;text-align:center;height:20px">${row[c] ? esc(row[c].caption) : ''}</td>`;
+        }
+        wordHTML += `</tr>`;
+      }
+      wordHTML += `</table><br>`;
+    });
+  }
+
+  // Signature
+  if (data.includes.signature) {
+    wordHTML += `<br><table class="sig-table">
+      <tr><td class="label">${esc(data.sigRole)}</td><td>${esc(data.sigName)}</td></tr>
+      <tr><td class="label">Date</td><td>${data.sigDate ? formatDate(data.sigDate) : ''}</td></tr>
+    </table>`;
+  }
+
+  // Footer
+  wordHTML += `<br><div style="font-size:7pt;color:#666;border-top:1px solid #ccc;padding-top:4px">
+    ${esc(data.docCode)} &nbsp;|&nbsp; Revision: ${esc(data.revision)} &nbsp;|&nbsp; ${esc(data.footerAddress)} &nbsp;|&nbsp; ${esc(data.footerEmail)}
+  </div>`;
+
+  wordHTML += `</` + `body></html>`;
+
+  // Build MHTML body
+  let mhtml = "MIME-Version: 1.0\r\n";
+  mhtml += `Content-Type: multipart/related; boundary="${boundary}"\r\n\r\n`;
+  
+  // HTML Part
+  mhtml += `--${boundary}\r\n`;
+  mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n\r\n";
+  mhtml += wordHTML + "\r\n\r\n";
+  
+  // Attachments
+  attachments.forEach(att => {
+    mhtml += `--${boundary}\r\n`;
+    mhtml += `Content-Type: ${att.mime}\r\n`;
+    mhtml += "Content-Transfer-Encoding: base64\r\n";
+    mhtml += `Content-ID: <${att.cid}>\r\n\r\n`;
+    mhtml += att.base64 + "\r\n\r\n";
+  });
+  mhtml += `--${boundary}--\r\n`;
+
+  // Create Blob and download as .doc (MHTML inside)
+  const blob = new Blob(['\ufeff', mhtml], { type: 'application/msword' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'Landscaping_Report.doc';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('✅ Word document downloaded!');
+}
+
 // ===== EXPORT EXCEL =====
 function exportExcel() {
   showToast('📊 Generating Excel file...');
   const data = gatherData();
+  
+  const boundary = "----NextPart_ExcelBound";
+  const attachments = [];
+  
   let excelHTML = `
     <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
     <head><meta charset="utf-8"></head><body>
@@ -1471,13 +1828,52 @@ function exportExcel() {
   }
   
   // Photos
-  if(data.includes.photos && data.photos.length > 0) {
+  const excelAllPhotos = data.photoLocations.flatMap(loc => loc.photos);
+  if(data.includes.photos && excelAllPhotos.length > 0) {
     excelHTML += `<h4>${esc(data.photosTitle)}</h4>`;
-    excelHTML += `<table border="1"><thead><tr><th style="background:#d9e2f3">Photo</th><th style="background:#d9e2f3">Caption</th></tr></thead><tbody>`;
-    data.photos.forEach((p, i) => {
-      excelHTML += `<tr><td style="width:200px; height:150px; text-align:center;"><img src="${p.dataUrl}" width="180" style="max-height:140px; object-fit:contain;" /></td><td>${esc(p.caption)}</td></tr>`;
+    
+    let cols;
+    if (data.gridLayout === '3x3') { cols = 3; }
+    else if (data.gridLayout === 'custom') { cols = Math.max(1, Math.min(6, parseInt(document.getElementById('customCols').value) || 4)); }
+    else { cols = 4; }
+    const colWidth = Math.floor(100 / cols);
+    const imgWidth = Math.floor(620 / cols);
+    const imgHeight = Math.floor(imgWidth * 0.75);
+
+    data.photoLocations.forEach((loc, locIdx) => {
+      if (loc.photos.length === 0) return;
+      if (loc.heading) {
+        excelHTML += `<h5 style="font-family:Calibri,sans-serif;font-size:12pt;font-weight:bold;text-align:center;color:#1a5e1f;margin:8px 0 4px 0">${esc(loc.heading)}</h5>`;
+      }
+      excelHTML += `<table border="1" style="table-layout:fixed;width:100%;border-collapse:collapse;margin-top:4px">`;
+      for (let i = 0; i < loc.photos.length; i += cols) {
+        const row = loc.photos.slice(i, i + cols);
+        // Photo row
+        excelHTML += `<tr>`;
+        for (let c = 0; c < cols; c++) {
+          if (row[c]) {
+            const photoMatch = row[c].dataUrl.match(/^data:([^;]+);base64,(.+)$/);
+            if (photoMatch) {
+              const cid = `excel_photo_${locIdx}_${i + c}`;
+              attachments.push({ cid: cid, mime: photoMatch[1], base64: photoMatch[2] });
+              excelHTML += `<td style="width:${colWidth}%;height:${imgHeight + 10}px;text-align:center;vertical-align:middle"><img src="cid:${cid}" width="${imgWidth}" height="${imgHeight}" /></td>`;
+            } else {
+              excelHTML += `<td style="width:${colWidth}%;height:${imgHeight + 10}px;text-align:center;vertical-align:middle"></td>`;
+            }
+          } else {
+            excelHTML += `<td style="width:${colWidth}%;text-align:center;vertical-align:middle"></td>`;
+          }
+        }
+        excelHTML += `</tr>`;
+        // Caption row
+        excelHTML += `<tr>`;
+        for (let c = 0; c < cols; c++) {
+          excelHTML += `<td style="font-size:8pt;color:#333;font-style:italic;text-align:center;height:20px">${row[c] ? esc(row[c].caption) : ''}</td>`;
+        }
+        excelHTML += `</tr>`;
+      }
+      excelHTML += `</table><br>`;
     });
-    excelHTML += `</tbody></table><br>`;
   }
   
   // Signature
@@ -1486,10 +1882,29 @@ function exportExcel() {
     excelHTML += `<table border="1"><tr><td style="background:#f2f2f2; width:100px;">Role</td><td>${esc(data.sigRole)}</td></tr><tr><td style="background:#f2f2f2">Name</td><td>${esc(data.sigName)}</td></tr><tr><td style="background:#f2f2f2">Date</td><td>${data.sigDate ? formatDate(data.sigDate) : ''}</td></tr></table>`;
   }
   
-  excelHTML += `</body></html>`;
+  excelHTML += `</` + `body></html>`;
   
-  // Create Blob and download
-  const blob = new Blob([excelHTML], { type: 'application/vnd.ms-excel' });
+  // Build MHTML body for Excel
+  let mhtml = "MIME-Version: 1.0\r\n";
+  mhtml += `Content-Type: multipart/related; boundary="${boundary}"\r\n\r\n`;
+  
+  // HTML Part
+  mhtml += `--${boundary}\r\n`;
+  mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n\r\n";
+  mhtml += excelHTML + "\r\n\r\n";
+  
+  // Attachments
+  attachments.forEach(att => {
+    mhtml += `--${boundary}\r\n`;
+    mhtml += `Content-Type: ${att.mime}\r\n`;
+    mhtml += "Content-Transfer-Encoding: base64\r\n";
+    mhtml += `Content-ID: <${att.cid}>\r\n\r\n`;
+    mhtml += att.base64 + "\r\n\r\n";
+  });
+  mhtml += `--${boundary}--\r\n`;
+
+  // Create Blob and download as .xls (MHTML inside)
+  const blob = new Blob([mhtml], { type: 'application/vnd.ms-excel' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
@@ -1498,6 +1913,7 @@ function exportExcel() {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  showToast('✅ Excel file downloaded!');
 }
 
 // ===== EXPORT PDF =====
