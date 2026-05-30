@@ -43,7 +43,7 @@ img { max-width: 100%; display: block; }
 
 /* ===== EDITOR PANEL ===== */
 .editor-panel {
-  width: 480px; min-width: 480px; max-width: 480px; height: 100vh; display: flex; flex-direction: column;
+  width: 600px; min-width: 600px; max-width: 600px; height: 100vh; display: flex; flex-direction: column;
   background: var(--bg-secondary); border-right: 1px solid var(--border-color);
 }
 .editor-header {
@@ -133,7 +133,7 @@ img { max-width: 100%; display: block; }
 .logo-upload-zone input[type="file"] { display: none; }
 
 /* ===== DYNAMIC TABLE ===== */
-.dynamic-table { width: max-content; border-collapse: collapse; font-size: 11px; min-width: 850px; }
+.dynamic-table { width: 100%; border-collapse: collapse; font-size: 11px; }
 .dynamic-table th {
   background: rgba(46,160,67,0.1); color: var(--accent-light); padding: 6px 4px;
   text-align: left; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px;
@@ -397,7 +397,7 @@ img { max-width: 100%; display: block; }
 
 /* ===== SCROLLBAR for tables ===== */
 /* ===== SCROLLBAR for tables (now handled by section-body) ===== */
-.table-scroll { margin: 0 -4px; padding: 0 4px; overflow: visible; }
+.table-scroll { margin: 0 -4px; padding: 0 4px; overflow-x: auto; }
 .table-scroll::-webkit-scrollbar { height: 4px; }
 .table-scroll::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 2px; }
 </style>
