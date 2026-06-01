@@ -265,15 +265,16 @@ img { max-width: 100%; display: block; }
 
 /* ===== REPORT STYLES (inside preview & print) ===== */
 .report-header {
-  display: flex; align-items: center; gap: 8px; padding-bottom: 4px;
-  border-bottom: 3px solid; border-image: linear-gradient(to right, #b5cc18, #0e8a7d, #1a6fb5, #7b2d8e, #e91e63) 1;
+  display: flex; align-items: flex-end; justify-content: space-between; padding-bottom: 4px;
+  border-bottom: 3px solid #1a5e1f;
   margin-bottom: 6px;
 }
-.report-header .logo-img { height: 40px; width: auto; }
+.report-header .logo-img { height: 40px; width: 40px; object-fit: contain; }
+.report-header .header-left-group { display: flex; align-items: center; gap: 8px; }
 .report-header .header-text { flex: 1; }
-.report-header .company-name { font-size: 14pt; font-weight: 700; color: #1a5e1f; }
-.report-header .company-tagline { font-size: 8pt; color: #333; }
-.report-header .company-certs { font-size: 6pt; color: #666; margin-top: 1px; }
+.report-header .company-name { font-size: 14pt; font-weight: 700; color: #1a5e1f; line-height: 1.2; }
+.report-header .company-tagline { font-size: 8pt; color: #333; line-height: 1.2; }
+.report-header .company-certs { font-size: 6pt; color: #666; text-align: right; margin-bottom: 2px; white-space: nowrap; }
 
 .report-title-bar {
   text-align: center; border: 1px solid #000; padding: 3px 0; margin-bottom: 6px;
@@ -1354,12 +1355,14 @@ function refreshPreview() {
   const container = document.getElementById('previewContainer');
 
   const headerHTML = `<div class="report-header">
-    ${data.logo ? `<img src="${data.logo}" class="logo-img">` : '<div style="width:40px;height:40px;background:#eee;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#999">LOGO</div>'}
-    <div class="header-text">
-      <div class="company-name">${esc(data.companyName)}</div>
-      <div class="company-tagline">${esc(data.tagline)}</div>
-      <div class="company-certs">${esc(data.certifications)}</div>
+    <div class="header-left-group">
+      ${data.logo ? `<img src="${data.logo}" class="logo-img">` : '<div style="width:40px;height:40px;background:#eee;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#999">LOGO</div>'}
+      <div class="header-text">
+        <div class="company-name">${esc(data.companyName)}</div>
+        <div class="company-tagline">${esc(data.tagline)}</div>
+      </div>
     </div>
+    <div class="company-certs">${esc(data.certifications)}</div>
   </div>`;
 
   // Calculate layout parameters first for correct page numbering
@@ -1706,15 +1709,20 @@ function exportWord() {
 
   const getHeaderHTML = () => `
     <div style="mso-element:header" id="h1">
-      <table style="width:100%; border-collapse:collapse; margin-bottom:6px; border-bottom:3px solid #1a5e1f;">
+      <table style="width:100%; border-collapse:collapse; margin-bottom:6px; border-bottom:3px solid #1a5e1f;" width="100%">
         <tr>
-          <td style="width:50px; padding:0 0 4px 0; vertical-align:middle;">
-            ${logoLocation ? `<img src="${logoLocation}" height="40" style="display:block;" />` : '<div style="width:40px;height:40px;background:#eee;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#999">LOGO</div>'}
+          <!-- Logo Cell -->
+          <td width="45" style="width:34pt; padding:0 0 4px 0; vertical-align:bottom;">
+            ${logoLocation ? `<img src="${logoLocation}" width="40" height="40" style="width:30pt; height:30pt; max-width:30pt; max-height:30pt; display:block;" />` : '<div style="width:30pt;height:30pt;background:#eee;border:1px solid #ddd;font-size:8px;color:#999;line-height:30pt;text-align:center;font-family:\'Cambria\', Georgia, serif;">LOGO</div>'}
           </td>
-          <td style="padding:0 0 4px 8px; vertical-align:middle; text-align:left;">
-            <div style="font-size:14pt; font-weight:700; color:#1a5e1f; font-family:\'Cambria\', Georgia, serif;">${esc(data.companyName)}</div>
-            <div style="font-size:8pt; color:#333; font-family:\'Cambria\', Georgia, serif;">${esc(data.tagline)}</div>
-            <div style="font-size:6pt; color:#666; font-family:\'Cambria\', Georgia, serif; margin-top:1px;">${esc(data.certifications)}</div>
+          <!-- Company Info Cell -->
+          <td style="padding:0 0 4px 8px; vertical-align:bottom; text-align:left;">
+            <div style="font-size:14pt; font-weight:700; color:#1a5e1f; font-family:\'Cambria\', Georgia, serif; line-height:1.2;">${esc(data.companyName)}</div>
+            <div style="font-size:8pt; color:#333; font-family:\'Cambria\', Georgia, serif; line-height:1.2;">${esc(data.tagline)}</div>
+          </td>
+          <!-- Certifications Cell -->
+          <td style="padding:0 0 4px 0; vertical-align:bottom; text-align:right; white-space:nowrap;">
+            <div style="font-size:6pt; color:#666; font-family:\'Cambria\', Georgia, serif; line-height:1.2;">${esc(data.certifications)}</div>
           </td>
         </tr>
       </table>
@@ -1845,7 +1853,7 @@ function exportWord() {
 
   // 2. PHOTO PAGES
   // Use conservative dimensions to prevent Word from overflowing to next page or next line
-  const availableHeight = 200; // 200mm to be extremely safe on A4
+  const availableHeight = 220; // 220mm as requested by user
   const headingHeight = 8;
   const captionRowHeight = 6;
   const usableHeight = availableHeight - headingHeight - (rowsPerPage * captionRowHeight);
