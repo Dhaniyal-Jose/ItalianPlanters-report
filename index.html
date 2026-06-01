@@ -1633,33 +1633,51 @@ function esc(str) {
 }
 
 // ===== EXPORT WORD =====
+// Helper: wrap base64 string into 76-char lines (MHTML spec requirement)
+function wrapBase64(b64) {
+  const lines = [];
+  for (let i = 0; i < b64.length; i += 76) {
+    lines.push(b64.substring(i, i + 76));
+  }
+  return lines.join('\r\n');
+}
+
+// Helper: get file extension from MIME type
+function mimeToExt(mime) {
+  const map = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp', 'image/bmp': 'bmp', 'image/svg+xml': 'svg' };
+  return map[mime] || 'png';
+}
+
 function exportWord() {
   showToast('📄 Generating Word document...');
   const data = gatherData();
   
   const boundary = "----NextPart_ReportBound";
   const attachments = [];
+  const baseUrl = "file:///C:/report_images/";
   
   // Attach logo if present
-  let logoCid = "";
+  let logoLocation = "";
   if (data.logo) {
     const match = data.logo.match(/^data:([^;]+);base64,(.+)$/);
     if (match) {
-      logoCid = "logo_img";
-      attachments.push({ cid: logoCid, mime: match[1], base64: match[2] });
+      const loc = baseUrl + "logo_img." + mimeToExt(match[1]);
+      logoLocation = loc;
+      attachments.push({ location: loc, cid: "logo_img", mime: match[1], base64: match[2] });
     }
   }
 
-  // Pre-process photos and assign them CIDs
-  let photoCidMap = new Map();
+  // Pre-process photos and assign them locations
+  let photoLocationMap = new Map();
   data.photoLocations.forEach((loc, locIdx) => {
     loc.photos.forEach((photo, photoIdx) => {
       if (photo.dataUrl) {
         const match = photo.dataUrl.match(/^data:([^;]+);base64,(.+)$/);
         if (match) {
           const cid = `word_photo_${locIdx}_${photo.id}`;
-          attachments.push({ cid: cid, mime: match[1], base64: match[2] });
-          photoCidMap.set(photo.id, cid);
+          const fileLoc = baseUrl + cid + "." + mimeToExt(match[1]);
+          attachments.push({ location: fileLoc, cid: cid, mime: match[1], base64: match[2] });
+          photoLocationMap.set(photo.id, fileLoc);
         }
       }
     });
@@ -1687,30 +1705,34 @@ function exportWord() {
   const totalPages = 1 + photoPageCount;
 
   const getHeaderHTML = () => `
-    <table style="width:100%; border-collapse:collapse; margin-bottom:6px; border-bottom:3px solid #1a5e1f;">
-      <tr>
-        <td style="width:50px; padding:0 0 4px 0; vertical-align:middle;">
-          ${logoCid ? `<img src="cid:${logoCid}" style="height:40px; display:block;" />` : '<div style="width:40px;height:40px;background:#eee;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#999">LOGO</div>'}
-        </td>
-        <td style="padding:0 0 4px 8px; vertical-align:middle; text-align:left;">
-          <div style="font-size:14pt; font-weight:700; color:#1a5e1f; font-family:\'Cambria\', Georgia, serif;">${esc(data.companyName)}</div>
-          <div style="font-size:8pt; color:#333; font-family:\'Cambria\', Georgia, serif;">${esc(data.tagline)}</div>
-          <div style="font-size:6pt; color:#666; font-family:\'Cambria\', Georgia, serif; margin-top:1px;">${esc(data.certifications)}</div>
-        </td>
-      </tr>
-    </table>
+    <div style="mso-element:header" id="h1">
+      <table style="width:100%; border-collapse:collapse; margin-bottom:6px; border-bottom:3px solid #1a5e1f;">
+        <tr>
+          <td style="width:50px; padding:0 0 4px 0; vertical-align:middle;">
+            ${logoLocation ? `<img src="${logoLocation}" height="40" style="display:block;" />` : '<div style="width:40px;height:40px;background:#eee;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:8px;color:#999">LOGO</div>'}
+          </td>
+          <td style="padding:0 0 4px 8px; vertical-align:middle; text-align:left;">
+            <div style="font-size:14pt; font-weight:700; color:#1a5e1f; font-family:\'Cambria\', Georgia, serif;">${esc(data.companyName)}</div>
+            <div style="font-size:8pt; color:#333; font-family:\'Cambria\', Georgia, serif;">${esc(data.tagline)}</div>
+            <div style="font-size:6pt; color:#666; font-family:\'Cambria\', Georgia, serif; margin-top:1px;">${esc(data.certifications)}</div>
+          </td>
+        </tr>
+      </table>
+    </div>
   `;
 
-  const getFooterHTML = (pageNum) => `
-    <table style="width:100%; border-collapse:collapse; margin-top:6px; border-top:1px solid #ccc; font-size:6pt; color:#666; font-family:\'Cambria\', Georgia, serif;">
-      <tr>
-        <td style="width:20%; padding:4px 0 0 0; text-align:left; vertical-align:middle;">${esc(data.docCode)}</td>
-        <td style="width:15%; padding:4px 0 0 0; text-align:center; vertical-align:middle;">Revision: ${esc(data.revision)}</td>
-        <td style="width:30%; padding:4px 0 0 0; text-align:center; vertical-align:middle;">${esc(data.footerAddress)}</td>
-        <td style="width:20%; padding:4px 0 0 0; text-align:center; vertical-align:middle;">${esc(data.footerEmail)}</td>
-        <td style="width:15%; padding:4px 0 0 0; text-align:right; vertical-align:middle; font-weight:bold; color:#333;">Page ${pageNum} of ${totalPages}</td>
-      </tr>
-    </table>
+  const getFooterHTML = () => `
+    <div style="mso-element:footer" id="f1">
+      <table style="width:100%; border-collapse:collapse; margin-top:6px; border-top:1px solid #ccc; font-size:6pt; color:#666; font-family:\'Cambria\', Georgia, serif;">
+        <tr>
+          <td style="width:20%; padding:4px 0 0 0; text-align:left; vertical-align:middle;">${esc(data.docCode)}</td>
+          <td style="width:15%; padding:4px 0 0 0; text-align:center; vertical-align:middle;">Revision: ${esc(data.revision)}</td>
+          <td style="width:30%; padding:4px 0 0 0; text-align:center; vertical-align:middle;">${esc(data.footerAddress)}</td>
+          <td style="width:20%; padding:4px 0 0 0; text-align:center; vertical-align:middle;">${esc(data.footerEmail)}</td>
+          <td style="width:15%; padding:4px 0 0 0; text-align:right; vertical-align:middle; font-weight:bold; color:#333;">Page <span style="mso-field-code:' PAGE '"></span> of <span style="mso-field-code:' NUMPAGES '"></span></td>
+        </tr>
+      </table>
+    </div>
   `;
 
   // === TEXT SECTION ===
@@ -1816,25 +1838,24 @@ function exportWord() {
   // 1. FIRST PAGE
   pagesHTML += `
     <div class="report-page">
-      <table class="print-table" style="width:100%; border-collapse:collapse; height:100%;">
-        <thead><tr><td style="padding: 0 0 6px 0; border:none;">${getHeaderHTML()}</td></tr></thead>
-        <tbody><tr><td style="padding: 6px 0; vertical-align: top; height: 100%; border:none;">
-          ${textContent}
-          ${(allPhotos.length === 0 || !data.includes.photos) && data.includes.signature ? renderSignature(data) : ''}
-        </td></tr></tbody>
-        <tfoot><tr><td style="padding: 6px 0 0 0; vertical-align: bottom; border:none;">${getFooterHTML(1)}</td></tr></tfoot>
-      </table>
+      ${textContent}
+      ${(allPhotos.length === 0 || !data.includes.photos) && data.includes.signature ? renderSignature(data) : ''}
     </div>
   `;
 
   // 2. PHOTO PAGES
-  const availableHeight = 270 - 18 - 10;
+  // Use conservative dimensions to prevent Word from overflowing to next page or next line
+  const availableHeight = 200; // 200mm to be extremely safe on A4
   const headingHeight = 8;
-  const captionRowHeight = 5;
+  const captionRowHeight = 6;
   const usableHeight = availableHeight - headingHeight - (rowsPerPage * captionRowHeight);
   const photoRowHeight = Math.floor(usableHeight / rowsPerPage);
+  
+  // A4 printable width is ~186mm. Use 180mm to allow for borders/margins without wrapping.
+  const cellWidthMm = (180 / cols).toFixed(1);
+  const imgWidthPx = Math.floor((180 / cols) * 3.78) - 4; // subtract 4px for borders
+  const imgHeightPx = Math.floor(photoRowHeight * 3.78) - 4;
 
-  let currentPage = 2;
   if (data.includes.photos && allPhotos.length > 0) {
     let isFirstPhotoPage = true;
     const totalLocations = data.photoLocations.length;
@@ -1847,35 +1868,32 @@ function exportWord() {
       for (let start = 0; start < loc.photos.length; start += photosPerPage) {
         let photoContent = '';
         
-        // Show main section title on very first photo page
         if (isFirstPhotoPage) {
           photoContent += `<div class="report-section-heading" style="margin-bottom:4px">${esc(data.photosTitle)}</div>`;
           isFirstPhotoPage = false;
         }
 
-        // Show location heading at start of each location's photos
         if (start === 0 && loc.heading) {
           photoContent += `<div style="font-family:Calibri,sans-serif;font-size:12pt;font-weight:bold;text-align:center;padding:4px 0 2px;margin-bottom:4px;color:#1a5e1f">${esc(loc.heading)}</div>`;
         }
         
         photoContent += `<table class="photo-grid-table" style="width:100%; border-collapse:collapse; margin-bottom:0; table-layout:fixed;">`;
         const pagePhotos = loc.photos.slice(start, start + photosPerPage);
-        const cellWidthMm = (186 / cols).toFixed(1);
         for (let r = 0; r < rowsPerPage; r++) {
           const rowPhotos = pagePhotos.slice(r * cols, (r + 1) * cols);
           if (rowPhotos.length === 0) break;
           photoContent += '<tr>';
           for (let c2 = 0; c2 < cols; c2++) {
             if (rowPhotos[c2]) {
-              const cid = photoCidMap.get(rowPhotos[c2].id);
-              photoContent += `<td class="photo-cell" style="width:${cellWidthMm}mm; height:${photoRowHeight}mm; border:1px solid #000; padding:0; text-align:center; vertical-align:middle; overflow:hidden;"><img src="cid:${cid}" style="width:${cellWidthMm}mm; height:${photoRowHeight}mm; display:block;" alt=""></td>`;
+              const imgLoc = photoLocationMap.get(rowPhotos[c2].id);
+              photoContent += `<td style="width:${cellWidthMm}mm; height:${photoRowHeight}mm; border:1px solid #000; padding:0; text-align:center; vertical-align:middle; overflow:hidden;"><img src="${imgLoc}" width="${imgWidthPx}" height="${imgHeightPx}" style="display:block; margin:0 auto;" alt=""></td>`;
             } else {
-              photoContent += `<td class="photo-cell" style="width:${cellWidthMm}mm; height:${photoRowHeight}mm; border:1px solid #000; padding:0; text-align:center; vertical-align:middle; overflow:hidden;"></td>`;
+              photoContent += `<td style="width:${cellWidthMm}mm; height:${photoRowHeight}mm; border:1px solid #000; padding:0; text-align:center; vertical-align:middle; overflow:hidden;"></td>`;
             }
           }
           photoContent += '</tr><tr>';
           for (let c2 = 0; c2 < cols; c2++) {
-            photoContent += `<td class="caption-cell" style="width:${cellWidthMm}mm; border:1px solid #000; font-size:8pt; color:#333; padding:1px 3px; height:14px; vertical-align:middle; font-weight:bold; text-transform:uppercase; text-align:center;">${rowPhotos[c2] ? esc(rowPhotos[c2].caption) : ''}</td>`;
+            photoContent += `<td style="width:${cellWidthMm}mm; border:1px solid #000; font-size:8pt; color:#333; padding:1px 3px; height:14px; vertical-align:middle; font-weight:bold; text-transform:uppercase; text-align:center;">${rowPhotos[c2] ? esc(rowPhotos[c2].caption) : ''}</td>`;
           }
           photoContent += '</tr>';
         }
@@ -1887,15 +1905,11 @@ function exportWord() {
         }
 
         pagesHTML += `
-          <div class="report-page" style="page-break-before: always;">
-            <table class="print-table" style="width:100%; border-collapse:collapse; height:100%;">
-              <thead><tr><td style="padding: 0 0 6px 0; border:none;">${getHeaderHTML()}</td></tr></thead>
-              <tbody><tr><td style="padding: 6px 0; vertical-align: top; height: 100%; border:none;">${photoContent}</td></tr></tbody>
-              <tfoot><tr><td style="padding: 6px 0 0 0; vertical-align: bottom; border:none;">${getFooterHTML(currentPage)}</td></tr></tfoot>
-            </table>
+          <br clear="all" style="page-break-before:always; mso-break-type:page-break" />
+          <div class="report-page">
+            ${photoContent}
           </div>
         `;
-        currentPage++;
       }
     });
   }
@@ -1914,15 +1928,24 @@ function exportWord() {
       </w:WordDocument>
     </xml>
     <style>
-      @page { size: 210mm 297mm; margin: 12mm; }
+      @page Section1 {
+        size: 210mm 297mm;
+        margin: 20mm 12mm 20mm 12mm;
+        mso-header-margin: 10mm;
+        mso-footer-margin: 10mm;
+        mso-header: h1;
+        mso-footer: f1;
+      }
+      div.Section1 { page: Section1; }
+      table#hrdftrtbl { margin: 0in 0in 0in 900in; width: 1px; height: 1px; overflow: hidden; }
+
       body { font-family: 'Cambria', Georgia, serif; font-size: 8pt; color: #000; margin: 0; padding: 0; background: #fff; }
       
       .report-page {
         background: #fff; width: 100%; padding: 0;
         margin: 0; color: #000; font-family: 'Cambria', Georgia, serif; font-size: 8pt;
-        box-sizing: border-box; page-break-before: always;
+        box-sizing: border-box;
       }
-      .report-page:first-child { page-break-before: avoid; }
       
       .print-table { width: 100%; border-collapse: collapse; height: 100%; }
       .print-table td { border: none; padding: 0; }
@@ -1968,7 +1991,7 @@ function exportWord() {
       .osh-list li { margin-bottom: 2px; }
       
       .photo-grid-table { width: 100%; border-collapse: collapse; margin-bottom: 0; table-layout: fixed; }
-      .photo-grid-table td { border: 1px solid #000; padding: 2px; text-align: center; vertical-align: top; }
+      .photo-grid-table td { border: 1px solid #000; padding: 0; text-align: center; vertical-align: middle; }
       
       .signature-table { width: 50%; border-collapse: collapse; margin-top: 10px; font-size: 8pt; }
       .signature-table td { border: 1px solid #000; padding: 3px 6px; }
@@ -1977,27 +2000,43 @@ function exportWord() {
     </style>
     </head>
     <body>
-      ${pagesHTML}
+      <div class="Section1">
+        ${pagesHTML}
+      </div>
+
+      <table id="hrdftrtbl">
+        <tr>
+          <td>
+            ${getHeaderHTML()}
+          </td>
+          <td>
+            ${getFooterHTML()}
+          </td>
+        </tr>
+      </table>
     </body>
     </html>
   `;
 
-  // Build MHTML body
+  // Build MHTML body with proper Content-Location headers
+  const htmlLocation = "file:///C:/report_images/report.html";
   let mhtml = "MIME-Version: 1.0\r\n";
   mhtml += `Content-Type: multipart/related; boundary="${boundary}"\r\n\r\n`;
   
-  // HTML Part
+  // HTML Part with Content-Location
   mhtml += `--${boundary}\r\n`;
-  mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n\r\n";
+  mhtml += `Content-Location: ${htmlLocation}\r\n`;
+  mhtml += "Content-Type: text/html; charset=\"utf-8\"\r\n";
+  mhtml += "Content-Transfer-Encoding: 8bit\r\n\r\n";
   mhtml += wordHTML + "\r\n\r\n";
   
-  // Attachments
+  // Attachments with Content-Location + line-wrapped base64
   attachments.forEach(att => {
     mhtml += `--${boundary}\r\n`;
+    mhtml += `Content-Location: ${att.location}\r\n`;
     mhtml += `Content-Type: ${att.mime}\r\n`;
-    mhtml += "Content-Transfer-Encoding: base64\r\n";
-    mhtml += `Content-ID: <${att.cid}>\r\n\r\n`;
-    mhtml += att.base64 + "\r\n\r\n";
+    mhtml += "Content-Transfer-Encoding: base64\r\n\r\n";
+    mhtml += wrapBase64(att.base64) + "\r\n\r\n";
   });
   mhtml += `--${boundary}--\r\n`;
 
