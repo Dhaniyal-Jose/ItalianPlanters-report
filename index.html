@@ -1744,7 +1744,8 @@ function exportWord() {
   `;
 
   // === TEXT SECTION ===
-  let textContent = `<div class="report-title-bar">${esc(data.reportTitle)}</div>`;
+  const sectionSpacer = '<p style="margin:0 0 8pt 0; padding:0; font-size:1px; line-height:1px; mso-line-height-rule:exactly;">&nbsp;</p>';
+  let textContent = `<div class="report-title-bar">${esc(data.reportTitle)}</div>` + sectionSpacer;
 
   // Details
   if (data.includes.details) {
@@ -1756,7 +1757,7 @@ function exportWord() {
           <td class="label-cell">JOB CODE</td><td class="value-cell">${esc(data.contractNo)}</td></tr>
       <tr><td class="label-cell">Service Provided</td><td class="value-cell">${services || '&mdash;'}</td>
           <td class="label-cell">Month</td><td class="value-cell">${esc(data.reportMonth)} ${esc(data.reportYear)}</td></tr>
-    </table>`;
+    </table>` + sectionSpacer;
   }
 
   // Annual Plan
@@ -1782,7 +1783,7 @@ function exportWord() {
       });
       textContent += `</tr>`;
     });
-    textContent += `</tbody></table>`;
+    textContent += `</tbody></table>` + sectionSpacer;
   }
 
   // PPM
@@ -1798,7 +1799,7 @@ function exportWord() {
         <td style="text-align:center;color:#c00">${t.pending ? '✗' : ''}</td>
         <td>${esc(t.remarks)}</td></tr>`;
     });
-    textContent += `</tbody></table>`;
+    textContent += `</tbody></table>` + sectionSpacer;
   }
 
   // Extra Tasks
@@ -1806,7 +1807,7 @@ function exportWord() {
     textContent += `<div class="report-section-heading">${esc(data.extraTitle)}</div>`;
     textContent += `<table class="tasks-table"><thead><tr><th style="width:30px">S/N</th><th>Description</th></tr></thead><tbody>`;
     data.extraTasks.forEach((t, i) => { textContent += `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${esc(t.text)}</td></tr>`; });
-    textContent += `</tbody></table>`;
+    textContent += `</tbody></table>` + sectionSpacer;
   }
 
   // Reactive Tasks
@@ -1814,7 +1815,7 @@ function exportWord() {
     textContent += `<div class="report-section-heading">${esc(data.reactiveTitle)}</div>`;
     textContent += `<table class="tasks-table"><thead><tr><th style="width:30px">S/N</th><th>Description</th></tr></thead><tbody>`;
     data.reactiveTasks.forEach((t, i) => { textContent += `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${esc(t.text)}</td></tr>`; });
-    textContent += `</tbody></table>`;
+    textContent += `</tbody></table>` + sectionSpacer;
   }
 
   // Constraints
@@ -1822,7 +1823,7 @@ function exportWord() {
     textContent += `<div class="report-section-heading">${esc(data.constraintsTitle)}</div>`;
     textContent += `<table class="tasks-table"><thead><tr><th style="width:30px">S/N</th><th>Incident Description</th><th style="width:70px">Status</th></tr></thead><tbody>`;
     data.constraints.forEach((c, i) => { textContent += `<tr><td>${String(i+1).padStart(2,'0')}</td><td>${esc(c.desc)}</td><td>${esc(c.status)}</td></tr>`; });
-    textContent += `</tbody></table>`;
+    textContent += `</tbody></table>` + sectionSpacer;
   }
 
   // Contacts
@@ -1830,7 +1831,7 @@ function exportWord() {
     textContent += `<div class="report-section-heading">${esc(data.contactsTitle)}</div>`;
     textContent += `<table class="contact-table"><thead><tr><th>Role</th><th>Name</th><th>Phone</th><th>Email</th></tr></thead><tbody>`;
     data.contacts.forEach(c => { textContent += `<tr><td>${esc(c.role)}</td><td>${esc(c.name)}</td><td>${esc(c.phone)}</td><td class="email-cell">${esc(c.email)}</td></tr>`; });
-    textContent += `</tbody></table>`;
+    textContent += `</tbody></table>` + sectionSpacer;
   }
 
   // OSH Training
@@ -1838,7 +1839,7 @@ function exportWord() {
     textContent += `<div class="report-section-heading">${esc(data.oshTitle)}</div>`;
     textContent += `<ul class="osh-list">`;
     data.oshTopics.forEach(t => { textContent += `<li>${esc(t)}</li>`; });
-    textContent += `</ul>`;
+    textContent += `</ul>` + sectionSpacer;
   }
 
   let pagesHTML = '';
@@ -1959,7 +1960,7 @@ function exportWord() {
       .print-table td { border: none; padding: 0; }
       
       .report-title-bar {
-        text-align: center; border: 1px solid #000; padding: 3px 0; margin-bottom: 6px;
+        text-align: center; border: 1px solid #000; padding: 3px 0; margin-bottom: 8pt;
         font-size: 8pt; font-weight: 400;
       }
       
@@ -1970,7 +1971,7 @@ function exportWord() {
       
       .report-section-heading {
         background: #d9e2f3; text-align: center; padding: 3px 0; font-weight: 700;
-        font-size: 7.5pt; border: 1px solid #000; margin-bottom: 0;
+        font-size: 7.5pt; border: 1px solid #000; margin-top: 8pt; margin-bottom: 4pt;
       }
       
       .plan-table { width: 100%; border-collapse: collapse; font-size: 6.5pt; margin-bottom: 6px; }
@@ -1995,7 +1996,7 @@ function exportWord() {
       .contact-table th { background: #d9e2f3; font-weight: 600; font-size: 6pt; }
       .contact-table .email-cell { color: #0000ff; text-decoration: underline; }
       
-      .osh-list { list-style: disc; padding-left: 16px; font-size: 8pt; margin: 4px 0 6px; }
+      .osh-list { margin: 4px 0 6px 20pt; padding: 0; font-size: 8pt; }
       .osh-list li { margin-bottom: 2px; }
       
       .photo-grid-table { width: 100%; border-collapse: collapse; margin-bottom: 0; table-layout: fixed; }
